@@ -3,7 +3,9 @@ use std::{collections::HashSet, io::{Read, Write}, net::TcpStream};
 use ctru::{applets::swkbd::{self, Button, ButtonConfig, Features, SoftwareKeyboard}, prelude::*};
 use serde::Serialize;
 
-const TOKEN: &'static str = "[redacted]";
+static_toml::static_toml! {
+    const CONFIG = include_toml!("mk-config.toml");
+}
 
 #[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -47,15 +49,15 @@ struct Post {
 }
 
 fn create_post(post: &Post) -> String {
-    let json = serde_json::to_string_pretty(post).unwrap();
+    let json = serde_json::to_string(post).unwrap();
     format!("POST /api/notes/create HTTP/1.1\r
 Content-Type: application/json\r
 User-Agent: misskey-3ds\r
-Authorization: Bearer {TOKEN}\r
-Host: eepy.moe\r
+Authorization: Bearer {}\r
+Host: {}\r
 Content-Length: {}\r
 \r
-{json}", json.len())
+{json}", CONFIG.token, CONFIG.host, json.len())
 }
 
 fn wait_to_exit(apt: &Apt, gfx: &Gfx, hid: &mut Hid) {
@@ -76,15 +78,14 @@ fn main() {
     let mut hid = Hid::new().unwrap();
     let gfx = Gfx::new().unwrap();
     let _console = Console::new(gfx.top_screen.borrow_mut());
-    let mut sockets = Soc::new().unwrap();
-    // sockets.redirect_to_3dslink(true, true).unwrap();
+    let _soc = Soc::new().unwrap();
 
     let mut keyboard = SoftwareKeyboard::new(swkbd::Kind::Normal, ButtonConfig::LeftRight);
     keyboard.configure_button(Button::Left, "Cancel", false);
     keyboard.configure_button(Button::Right, "Submit", true);
     keyboard.set_features(Features::MULTILINE | Features::PREDICTIVE_INPUT);
 
-    let mut tcp = match TcpStream::connect("192.168.178.89:80") {
+    let mut tcp = match TcpStream::connect(CONFIG.connect_to) {
         Ok(tcp) => tcp,
         Err(err) => {
             eprintln!("Couldn't connect: {err}");
@@ -102,10 +103,6 @@ fn main() {
         println!("{}", post);
         tcp.write_all(post.as_bytes()).unwrap();
         tcp.flush().unwrap();
-        // tcp.shutdown(std::net::Shutdown::Write).unwrap();
-        // let mut s = String::new();
-        // tcp.read_to_string(&mut s).unwrap();
-        // println!("{}", s);
     }
 
     wait_to_exit(&apt, &gfx, &mut hid);

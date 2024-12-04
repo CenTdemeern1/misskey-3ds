@@ -1,0 +1,3 @@
+token = "" # Put your API key here
+connect_to = "0.0.0.0" # Put the IP address of the instance you're connecting to here
+host = "example.com" # Put the hostname of the instance you're connecting to here
