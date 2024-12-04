@@ -8,6 +8,11 @@ ctru-rs = { git = "https://github.com/rust3ds/ctru-rs" }
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 static-toml = "1.2.0"
+curl = { version = "0.4", features = ["static-curl"] }
+
+[patch.crates-io]
+curl = { git = "https://github.com/FenrirWolf/curl-rust.git", branch = "horizon" }
+socket2 = { git = "https://github.com/FenrirWolf/socket2.git", branch = "horizon" }
 
 [package.metadata.cargo-3ds]
 romfs_dir = "romfs"

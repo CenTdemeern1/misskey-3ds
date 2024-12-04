@@ -1,6 +1,7 @@
 use std::{collections::HashSet, io::{Read, Write}, net::TcpStream};
 
 use ctru::{applets::swkbd::{self, Button, ButtonConfig, Features, SoftwareKeyboard}, prelude::*};
+use curl::easy::Easy;
 use serde::Serialize;
 
 static_toml::static_toml! {
@@ -85,6 +86,8 @@ fn main() {
     keyboard.configure_button(Button::Right, "Submit", true);
     keyboard.set_features(Features::MULTILINE | Features::PREDICTIVE_INPUT);
 
+    let easy = Easy::new();
+    easy.url(CONFIG.connect_to);
     let mut tcp = match TcpStream::connect(CONFIG.connect_to) {
         Ok(tcp) => tcp,
         Err(err) => {
