@@ -1,7 +1,11 @@
-use std::{collections::HashSet, io::{Read, Write}, net::TcpStream};
+#![allow(dead_code)]
+use std::{collections::HashSet, io::Write, net::TcpStream};
 
-use ctru::{applets::swkbd::{self, Button, ButtonConfig, Features, SoftwareKeyboard}, prelude::*};
+use ctru::{applets::{error::set_panic_hook, swkbd::{self, Button, ButtonConfig, Features, SoftwareKeyboard}}, prelude::*};
+use http::{Message, Method};
 use serde::Serialize;
+
+mod http;
 
 static_toml::static_toml! {
     const CONFIG = include_toml!("mk-config.toml");
@@ -48,16 +52,15 @@ struct Post {
     poll: Option<bool>,
 }
 
-fn create_post(post: &Post) -> String {
+fn create_post(post: &Post) -> Message {
     let json = serde_json::to_string(post).unwrap();
-    format!("POST /api/notes/create HTTP/1.1\r
-Content-Type: application/json\r
-User-Agent: misskey-3ds\r
-Authorization: Bearer {}\r
-Host: {}\r
-Content-Length: {}\r
-\r
-{json}", CONFIG.token, CONFIG.host, json.len())
+    let mut request = Message::new_request(Method::POST, "/api/notes/create");
+    request.set_header("Content-Type", "application/json");
+    request.set_header("User-Agent", "misskey-3ds");
+    request.set_header("Authorization", format!("Bearer {}", CONFIG.token));
+    request.set_header("Host", CONFIG.host);
+    request.set_content(Some(json.into_bytes().into_boxed_slice()));
+    request
 }
 
 fn wait_to_exit(apt: &Apt, gfx: &Gfx, hid: &mut Hid) {
@@ -79,13 +82,19 @@ fn main() {
     let gfx = Gfx::new().unwrap();
     let _console = Console::new(gfx.top_screen.borrow_mut());
     let _soc = Soc::new().unwrap();
+    // if let Err(e) = soc.redirect_to_3dslink(true, true) {
+    //     println!("Could not connect to 3dslink server: {}", e);
+    //     wait_to_exit(&apt, &gfx, &mut hid);
+    // }
+
+    set_panic_hook(false);
 
     let mut keyboard = SoftwareKeyboard::new(swkbd::Kind::Normal, ButtonConfig::LeftRight);
     keyboard.configure_button(Button::Left, "Cancel", false);
     keyboard.configure_button(Button::Right, "Submit", true);
     keyboard.set_features(Features::MULTILINE | Features::PREDICTIVE_INPUT);
 
-    let mut tcp = match TcpStream::connect(CONFIG.connect_to) {
+    let mut tcp = match TcpStream::connect((CONFIG.host, CONFIG.port as u16)) {
         Ok(tcp) => tcp,
         Err(err) => {
             eprintln!("Couldn't connect: {err}");
@@ -101,7 +110,7 @@ fn main() {
             ..Default::default()
         });
         println!("{}", post);
-        tcp.write_all(post.as_bytes()).unwrap();
+        tcp.write_all(&post.serialize()).unwrap();
         tcp.flush().unwrap();
     }
 
